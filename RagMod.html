@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#17201d">
+  <title>RagMod | Map Editor</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17201d;
+      --muted: #737c76;
+      --line: #d9ded8;
+      --paper: #f4f5ef;
+      --panel: #fffefa;
+      --green: #176b50;
+      --lime: #c5ed65;
+      --coral: #e2765b;
+      --canvas: #dce4da;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); min-width: 320px; }
+    button, input { font: inherit; }
+    button { color: inherit; cursor: pointer; }
+    .app { min-height: 100vh; display: grid; grid-template-rows: 66px 1fr; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 22px; background: var(--ink); color: #fffefa; border-bottom: 3px solid var(--lime); }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; background: var(--lime); color: var(--ink); font-weight: 900; font-size: 17px; transform: rotate(-5deg); }
+    .brand-name { font-size: 19px; font-weight: 900; letter-spacing: 1px; }
+    .brand-sub { margin-left: 12px; padding-left: 12px; border-left: 1px solid #58615b; color: #b8c0b9; font: 10px/1.3 monospace; letter-spacing: .8px; }
+    .header-actions { display: flex; align-items: center; gap: 9px; }
+    .status { display: flex; align-items: center; gap: 7px; margin-right: 6px; color: #c7d0c9; font-size: 11px; white-space: nowrap; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--lime); }
+    .status.dirty .status-dot { background: var(--coral); }
+    .button { min-height: 34px; padding: 0 12px; border: 1px solid #647069; background: transparent; color: #fffefa; font-size: 12px; font-weight: 700; }
+    .button:hover { border-color: var(--lime); color: var(--lime); }
+    .button.primary { border-color: var(--lime); background: var(--lime); color: var(--ink); }
+    .button.primary:hover { background: #d5f895; }
+    .button.light { background: var(--panel); color: var(--ink); border-color: var(--line); }
+    .button.light:hover { border-color: var(--green); color: var(--green); }
+    .layout { display: grid; grid-template-columns: 222px minmax(360px, 1fr) 284px; min-height: 0; height: calc(100vh - 66px); }
+    .sidebar, .inspector { overflow: auto; background: var(--panel); }
+    .sidebar { border-right: 1px solid var(--line); }
+    .inspector { border-left: 1px solid var(--line); }
+    .section { padding: 18px 15px; border-bottom: 1px solid var(--line); }
+    .section-heading { display: flex; align-items: center; justify-content: space-between; margin: 0 0 13px; color: var(--muted); font: 700 10px/1.2 monospace; letter-spacing: 1px; text-transform: uppercase; }
+    .scene-list { display: grid; gap: 4px; }
+    .scene-button { min-height: 37px; display: flex; justify-content: space-between; align-items: center; padding: 0 9px; border: 1px solid transparent; background: transparent; text-align: left; font-size: 11px; font-weight: 700; }
+    .scene-button:hover { background: #f2f5ed; }
+    .scene-button.active { background: #e9f2e9; border-color: #c4d9c4; color: var(--green); }
+    .scene-index { color: #929b93; font: 10px monospace; }
+    .action-stack { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .action-stack .button { min-height: 32px; padding: 0 7px; font-size: 10px; }
+    .tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .tool-button { min-height: 39px; padding: 5px 7px; border: 1px solid var(--line); background: #fffefa; font-size: 11px; font-weight: 700; }
+    .tool-button.active { background: var(--green); border-color: var(--green); color: white; }
+    .control-label { display: block; margin: 13px 0 6px; color: var(--muted); font: 700 10px monospace; letter-spacing: .3px; }
+    .field, .select { width: 100%; min-height: 34px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 0; background: #fffefa; color: var(--ink); font-size: 12px; }
+    .field:focus, .select:focus { outline: 2px solid #85b79a; outline-offset: 1px; }
+    .check-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; color: #4e5851; font-size: 11px; }
+    .check-row input { accent-color: var(--green); }
+    .workspace { display: grid; grid-template-rows: 49px minmax(240px, 1fr) 31px; min-width: 0; background: var(--canvas); }
+    .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 14px; background: #fffefa; border-bottom: 1px solid var(--line); }
+    .tool-context { color: var(--muted); font: 11px monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .zoom-controls { display: flex; align-items: center; gap: 5px; }
+    .icon-button { width: 29px; height: 29px; padding: 0; border: 1px solid var(--line); background: white; font-weight: 700; }
+    .icon-button:hover { border-color: var(--green); }
+    .zoom-value { min-width: 43px; text-align: center; font: 10px monospace; color: var(--muted); }
+    .canvas-wrap { position: relative; min-height: 0; overflow: hidden; background-color: var(--canvas); background-image: radial-gradient(#b7c4b5 0.7px, transparent 0.7px); background-size: 19px 19px; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+    .canvas-hint { position: absolute; left: 14px; bottom: 12px; padding: 6px 8px; background: rgba(255,254,250,.88); color: #5f6b62; font: 10px monospace; pointer-events: none; }
+    .workspace-footer { display: flex; align-items: center; justify-content: space-between; padding: 0 12px; background: #fffefa; border-top: 1px solid var(--line); color: var(--muted); font: 10px monospace; }
+    .inspector-title { margin: 0; color: var(--ink); font-size: 15px; }
+    .selection-id { color: var(--muted); font: 10px monospace; }
+    .property-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 8px; }
+    .property-grid .control-label { margin: 0 0 5px; }
+    .property-grid .field { min-height: 32px; }
+    .wide { grid-column: 1 / -1; }
+    .empty-selection { padding: 17px 12px; border: 1px dashed #c9d1c8; color: var(--muted); font-size: 11px; line-height: 1.6; }
+    .inspector-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 14px; }
+    .inspector-actions .button { font-size: 10px; }
+    .file-input { display: none; }
+    .key-help { color: var(--muted); font: 10px/1.8 monospace; }
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 185px minmax(300px, 1fr); height: auto; min-height: calc(100vh - 66px); }
+      .workspace { min-height: 560px; }
+      .inspector { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; }
+      .inspector .section { border-right: 1px solid var(--line); }
+    }
+    @media (max-width: 620px) {
+      .app { grid-template-rows: 58px 1fr; }
+      .topbar { padding: 0 12px; gap: 8px; }
+      .brand { gap: 8px; }
+      .brand-mark { width: 30px; height: 30px; }
+      .brand-name { font-size: 16px; }
+      .brand-sub, .status { display: none; }
+      .header-actions { gap: 5px; }
+      .button { min-height: 32px; padding: 0 8px; font-size: 10px; }
+      .layout { display: flex; flex-direction: column; min-height: calc(100vh - 58px); }
+      .sidebar { display: grid; grid-template-columns: 1fr 1fr; border-right: 0; border-bottom: 1px solid var(--line); }
+      .sidebar .section { padding: 12px; }
+      .sidebar .section:nth-child(3) { grid-column: 1 / -1; }
+      .scene-list { grid-template-columns: 1fr 1fr; }
+      .scene-button { min-height: 31px; font-size: 9px; }
+      .workspace { order: 2; min-height: 430px; grid-template-rows: 45px minmax(300px, 1fr) 29px; }
+      .inspector { order: 3; display: block; }
+      .inspector .section { border-right: 0; }
+      .tool-context { font-size: 9px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">R</div>
+        <div class="brand-name">RAGMOD</div>
+        <div class="brand-sub">MAP EDITOR<br>MONKMAP TOOL</div>
+      </div>
+      <div class="header-actions">
+        <div class="status" id="status"><span class="status-dot"></span><span id="statusText">Mapa novo</span></div>
+        <button class="button" id="openButton" type="button">Abrir mapa</button>
+        <button class="button primary" id="exportButton" type="button">Exportar .monkmap</button>
+        <input class="file-input" id="fileInput" type="file" accept=".monkmap,application/octet-stream">
+      </div>
+    </header>
+    <main class="layout">
+      <aside class="sidebar">
+        <section class="section">
+          <h2 class="section-heading">Cenas <span>8 MAPAS</span></h2>
+          <div class="scene-list" id="sceneList"></div>
+        </section>
+        <section class="section">
+          <h2 class="section-heading">Cena atual</h2>
+          <div class="action-stack">
+            <button class="button light" id="copyScene" type="button">Copiar cena</button>
+            <button class="button light" id="pasteScene" type="button" disabled>Colar cena</button>
+            <button class="button light" id="clearScene" type="button">Limpar cena</button>
+            <button class="button light" id="fitView" type="button">Enquadrar mapa</button>
+          </div>
+        </section>
+        <section class="section">
+          <h2 class="section-heading">Ferramenta</h2>
+          <div class="tool-grid">
+            <button class="tool-button active" data-mode="select" type="button">Selecionar</button>
+            <button class="tool-button" data-mode="brush" type="button">Brush</button>
+            <button class="tool-button" data-mode="platform" type="button">Plataforma</button>
+          </div>
+          <label class="control-label" for="brushId">ID do brush</label>
+          <input class="field" id="brushId" type="number" min="3" max="255" value="4">
+          <div class="property-grid" style="margin-top:10px">
+            <label><span class="control-label">Escala X</span><input class="field" id="brushXSize" type="number" step="8" value="0"></label>
+            <label><span class="control-label">Escala Y</span><input class="field" id="brushYSize" type="number" step="8" value="0"></label>
+            <label><span class="control-label">Profundidade Z</span><input class="field" id="brushZ" type="number" step="0.05" value="0"></label>
+            <label><span class="control-label">Ângulo</span><input class="field" id="brushAngle" type="number" step="0.02" value="0"></label>
+          </div>
+          <label class="check-row"><input id="snapToggle" type="checkbox" checked> Snap de 16 unidades</label>
+          <label class="check-row"><input id="flipToggle" type="checkbox"> Espelhar horizontalmente</label>
+        </section>
+      </aside>
+
+      <section class="workspace" aria-label="Área de edição do mapa">
+        <div class="toolbar">
+          <div class="tool-context" id="toolContext">SELECIONAR · Arraste objetos para mover</div>
+          <div class="zoom-controls">
+            <button class="icon-button" id="zoomOut" type="button" aria-label="Diminuir zoom">−</button>
+            <span class="zoom-value" id="zoomValue">50%</span>
+            <button class="icon-button" id="zoomIn" type="button" aria-label="Aumentar zoom">+</button>
+            <button class="icon-button" id="centerView" type="button" aria-label="Centralizar vista">⌖</button>
+          </div>
+        </div>
+        <div class="canvas-wrap" id="canvasWrap">
+          <canvas id="mapCanvas" tabindex="0" aria-label="Canvas do mapa"></canvas>
+          <div class="canvas-hint" id="canvasHint">Clique para selecionar · botão do meio ou direito para mover a vista</div>
+        </div>
+        <div class="workspace-footer"><span id="cursorPosition">X 0 · Y 0</span><span id="thingCount">0 OBJETOS</span></div>
+      </section>
+
+      <aside class="inspector">
+        <section class="section">
+          <h2 class="section-heading">Propriedades</h2>
+          <div id="emptySelection" class="empty-selection">Selecione um objeto no mapa para editar seus dados.</div>
+          <div id="propertyPanel" hidden>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px">
+              <h3 class="inspector-title" id="objectTitle">Brush</h3>
+              <span class="selection-id" id="selectionId">#0</span>
+            </div>
+            <div class="property-grid" id="propertyGrid"></div>
+            <div class="inspector-actions">
+              <button class="button light" id="duplicateThing" type="button">Duplicar</button>
+              <button class="button light" id="deleteThing" type="button">Excluir</button>
+            </div>
+          </div>
+        </section>
+        <section class="section">
+          <h2 class="section-heading">Teclas</h2>
+          <div class="key-help">F1 brush · F2 plataforma<br>ESC selecionar<br>Delete excluir selecionado<br>Scroll zoom · arrastar vista</div>
+        </section>
+      </aside>
+    </main>
+  </div>
+  <script>
+    (() => {
+      'use strict';
+      const MAP_COUNT = 8;
+      const RECORD_COUNT = 2250;
+      const RECORD_BYTES = 52;
+      const FILE_BYTES = MAP_COUNT * RECORD_COUNT * RECORD_BYTES;
+      const SCENES = ['Dojo Garden', 'Bridge', 'Plains', 'Death Valley', 'Final Confrontation', 'User Defined 1', 'Soccer Pitch', 'User Defined 3'];
+      const FIELDS = [
+        ['brush', 'Brush ID', 'int'], ['xpos', 'Posição X', 'int'], ['ypos', 'Posição Y', 'int'],
+        ['zpos', 'Profundidade Z', 'float'], ['xsize', 'Escala X', 'int'], ['ysize', 'Escala Y', 'int'],
+        ['angle', 'Ângulo', 'float'], ['anim_object', 'Objeto de animação', 'int'], ['anim_speed', 'Velocidade', 'float'],
+        ['shade', 'Sombra', 'int'], ['wind_effect', 'Efeito de vento', 'int'], ['spare2', 'Flip X', 'int'], ['spare3', 'Extra', 'int']
+      ];
+      const newRecord = () => ({ brush: 0, xpos: 0, ypos: 0, zpos: 0, xsize: 0, ysize: 0, angle: 0, anim_object: 0, anim_speed: 0, shade: 0, wind_effect: 0, spare2: 0, spare3: 0 });
+      const maps = Array.from({ length: MAP_COUNT }, () => []);
+      const canvas = document.getElementById('mapCanvas');
+      const context = canvas.getContext('2d');
+      const state = { scene: 0, mode: 'select', selected: -1, brushId: 4, brushXSize: 0, brushYSize: 0, brushZ: 0, brushAngle: 0, snap: true, flip: false, zoom: 0.5, cameraX: 1024, cameraY: 768, dirty: false, clipboard: null, fileName: 'mapdata.monkmap', drag: null, preview: null };
+      const propertyPanel = document.getElementById('propertyPanel');
+      const emptySelection = document.getElementById('emptySelection');
+      const propertyGrid = document.getElementById('propertyGrid');
+      const sceneList = document.getElementById('sceneList');
+
+      function setDirty(value = true) {
+        state.dirty = value;
+        document.getElementById('status').classList.toggle('dirty', value);
+        document.getElementById('statusText').textContent = value ? 'Alterações não exportadas' : state.fileName;
+      }
+      function activeObjects() { return maps[state.scene]; }
+      function markChanged() {
+        setDirty(true);
+        updateCount();
+        draw();
+      }
+      function updateCount() {
+        document.getElementById('thingCount').textContent = `${activeObjects().length} OBJETO${activeObjects().length === 1 ? '' : 'S'}`;
+      }
+      function buildScenes() {
+        sceneList.replaceChildren();
+        SCENES.forEach((name, index) => {
+          const button = document.createElement('button');
+          button.className = `scene-button${state.scene === index ? ' active' : ''}`;
+          button.type = 'button';
+          button.innerHTML = `<span>${name}</span><span class="scene-index">0${index + 1}</span>`;
+          button.addEventListener('click', () => {
+            state.scene = index;
+            state.selected = -1;
+            buildScenes();
+            updateInspector();
+            updateCount();
+            draw();
+          });
+          sceneList.append(button);
+        });
+      }
+      function setMode(mode) {
+        state.mode = mode;
+        document.querySelectorAll('.tool-button').forEach(button => button.classList.toggle('active', button.dataset.mode === mode));
+        const labels = { select: 'SELECIONAR · Arraste objetos para mover', brush: `BRUSH ${state.brushId} · Clique no mapa para posicionar`, platform: 'PLATAFORMA · Clique no mapa para posicionar' };
+        document.getElementById('toolContext').textContent = labels[mode];
+        canvas.style.cursor = mode === 'select' ? 'default' : 'crosshair';
+        draw();
+      }
+      function makePropertyInputs() {
+        propertyGrid.replaceChildren();
+        FIELDS.forEach(([key, label, type], index) => {
+          const wrapper = document.createElement('label');
+          if (['brush', 'anim_object', 'anim_speed', 'wind_effect', 'spare3'].includes(key)) wrapper.classList.add('wide');
+          const caption = document.createElement('span');
+          caption.className = 'control-label';
+          caption.textContent = label;
+          const input = document.createElement('input');
+          input.className = 'field';
+          input.type = 'number';
+          input.step = type === 'float' ? '0.01' : '1';
+          input.dataset.field = key;
+          input.addEventListener('change', () => {
+            const object = activeObjects()[state.selected];
+            if (!object) return;
+            object[key] = type === 'float' ? Number.parseFloat(input.value) || 0 : Number.parseInt(input.value, 10) || 0;
+            if (key === 'brush') document.getElementById('objectTitle').textContent = object.brush === 1 ? 'Plataforma' : `Brush ${object.brush}`;
+            markChanged();
+          });
+          wrapper.append(caption, input);
+          propertyGrid.append(wrapper);
+        });
+      }
+      function updateInspector() {
+        const object = activeObjects()[state.selected];
+        emptySelection.hidden = Boolean(object);
+        propertyPanel.hidden = !object;
+        if (!object) return;
+        document.getElementById('objectTitle').textContent = object.brush === 1 ? 'Plataforma' : `Brush ${object.brush}`;
+        document.getElementById('selectionId').textContent = `#${state.selected + 1}`;
+        propertyGrid.querySelectorAll('input').forEach(input => { input.value = object[input.dataset.field]; });
+      }
+      function resizeCanvas() {
+        const rect = canvas.getBoundingClientRect();
+        const ratio = window.devicePixelRatio || 1;
+        canvas.width = Math.max(1, Math.round(rect.width * ratio));
+        canvas.height = Math.max(1, Math.round(rect.height * ratio));
+        context.setTransform(ratio, 0, 0, ratio, 0, 0);
+        draw();
+      }
+      function viewSize() {
+        const rect = canvas.getBoundingClientRect();
+        return { width: rect.width, height: rect.height };
+      }
+      function worldToScreen(x, y) {
+        const { width, height } = viewSize();
+        return { x: (x - state.cameraX) * state.zoom + width / 2, y: (y - state.cameraY) * state.zoom + height / 2 };
+      }
+      function screenToWorld(x, y) {
+        const { width, height } = viewSize();
+        return { x: (x - width / 2) / state.zoom + state.cameraX, y: (y - height / 2) / state.zoom + state.cameraY };
+      }
+      function objectSize(object) {
+        if (object.brush === 1) return { width: Math.max(48, Math.abs(object.xsize + 256)), height: Math.max(12, Math.abs(object.ysize || 24)) };
+        return { width: Math.max(36, Math.min(360, Math.abs(object.xsize) + 72)), height: Math.max(30, Math.min(260, Math.abs(object.ysize) + 56)) };
+      }
+      function colorForBrush(id) {
+        const colors = ['#e2765b', '#377d73', '#d2a83c', '#4c7fba', '#91a942', '#cb7850', '#559e9a', '#8b7650'];
+        return colors[Math.abs(id) % colors.length];
+      }
+      function drawGrid(width, height) {
+        const step = 128 * state.zoom;
+        if (step < 12) return;
+        const topLeft = screenToWorld(0, 0);
+        const startX = Math.floor(topLeft.x / 128) * 128;
+        const startY = Math.floor(topLeft.y / 128) * 128;
+        context.save();
+        context.strokeStyle = 'rgba(75, 96, 78, .13)';
+        context.lineWidth = 1;
+        context.beginPath();
+        for (let x = startX; (x - topLeft.x) * state.zoom < width + 128; x += 128) {
+          const px = worldToScreen(x, topLeft.y).x;
+          context.moveTo(Math.round(px) + .5, 0);
+          context.lineTo(Math.round(px) + .5, height);
+        }
+        for (let y = startY; (y - topLeft.y) * state.zoom < height + 128; y += 128) {
+          const py = worldToScreen(topLeft.x, y).y;
+          context.moveTo(0, Math.round(py) + .5);
+          context.lineTo(width, Math.round(py) + .5);
+        }
+        context.stroke();
+        const origin = worldToScreen(0, 0);
+        context.strokeStyle = 'rgba(35, 91, 64, .38)';
+        context.beginPath();
+        context.moveTo(origin.x, 0); context.lineTo(origin.x, height);
+        context.moveTo(0, origin.y); context.lineTo(width, origin.y);
+        context.stroke();
+        context.restore();
+      }
+      function drawObject(object, index, ghost = false) {
+        const point = worldToScreen(object.xpos, object.ypos);
+        const size = objectSize(object);
+        const selected = index === state.selected && !ghost;
+        const width = Math.max(5, size.width * state.zoom);
+        const height = Math.max(5, size.height * state.zoom);
+        context.save();
+        context.translate(point.x, point.y);
+        context.rotate(object.angle || 0);
+        context.globalAlpha = ghost ? .55 : Math.max(.28, 1 - Math.max(0, object.shade) / 380);
+        if (object.brush === 29) {
+          context.strokeStyle = '#d45e48';
+          context.lineWidth = selected ? 3 : 2;
+          context.setLineDash([7, 5]);
+          context.beginPath(); context.moveTo(0, -height / 2); context.lineTo(0, height / 2); context.stroke();
+          context.setLineDash([]);
+        } else {
+          context.fillStyle = object.brush === 1 ? '#355a4d' : colorForBrush(object.brush);
+          context.strokeStyle = selected ? '#17201d' : 'rgba(23,32,29,.65)';
+          context.lineWidth = selected ? 2 : 1;
+          context.fillRect(-width / 2, -height / 2, width, height);
+          context.strokeRect(-width / 2, -height / 2, width, height);
+          if (object.spare2) {
+            context.strokeStyle = 'rgba(255,255,255,.8)';
+            context.beginPath(); context.moveTo(-width / 2 + 5, 0); context.lineTo(width / 2 - 5, 0); context.stroke();
+          }
+          context.fillStyle = '#fffefa';
+          context.font = 'bold 10px monospace';
+          context.textAlign = 'center'; context.textBaseline = 'middle';
+          context.fillText(object.brush === 1 ? 'PLAT' : String(object.brush), 0, 0, Math.max(20, width - 4));
+        }
+        if (selected) {
+          context.globalAlpha = 1;
+          context.strokeStyle = '#17201d'; context.lineWidth = 1; context.setLineDash([3, 3]);
+          context.strokeRect(-width / 2 - 4, -height / 2 - 4, width + 8, height + 8);
+          context.setLineDash([]);
+          context.fillStyle = '#c5ed65'; context.fillRect(-3, -3, 6, 6);
+        }
+        context.restore();
+      }
+      function draw() {
+        if (!context) return;
+        const { width, height } = viewSize();
+        context.clearRect(0, 0, width, height);
+        drawGrid(width, height);
+        activeObjects().forEach((object, index) => drawObject(object, index));
+        if (state.preview && state.mode !== 'select') {
+          const ghost = { ...newRecord(), brush: state.mode === 'platform' ? 1 : state.brushId, xpos: state.preview.x, ypos: state.preview.y, zpos: state.brushZ, xsize: state.brushXSize, ysize: state.brushYSize, angle: state.brushAngle, spare2: state.flip ? 1 : 0 };
+          drawObject(ghost, -1, true);
+        }
+        document.getElementById('zoomValue').textContent = `${Math.round(state.zoom * 100)}%`;
+      }
+      function snapValue(value) { return state.snap ? Math.round(value / 16) * 16 : Math.round(value); }
+      function hitTest(world) {
+        const list = activeObjects();
+        for (let index = list.length - 1; index >= 0; index--) {
+          const object = list[index];
+          const size = objectSize(object);
+          const dx = world.x - object.xpos;
+          const dy = world.y - object.ypos;
+          const cosine = Math.cos(-(object.angle || 0));
+          const sine = Math.sin(-(object.angle || 0));
+          const localX = dx * cosine - dy * sine;
+          const localY = dx * sine + dy * cosine;
+          if (Math.abs(localX) <= size.width / 2 && Math.abs(localY) <= size.height / 2) return index;
+        }
+        return -1;
+      }
+      function addObject(world) {
+        const object = newRecord();
+        object.brush = state.mode === 'platform' ? 1 : state.brushId;
+        object.xpos = snapValue(world.x);
+        object.ypos = snapValue(world.y);
+        object.zpos = state.mode === 'platform' ? 1 : state.brushZ;
+        object.xsize = state.brushXSize;
+        object.ysize = state.mode === 'platform' ? 0 : state.brushYSize;
+        object.angle = state.brushAngle;
+        object.spare2 = state.flip ? 1 : 0;
+        activeObjects().push(object);
+        state.selected = activeObjects().length - 1;
+        updateInspector();
+        markChanged();
+      }
+      function deleteSelected() {
+        if (state.selected < 0) return;
+        activeObjects().splice(state.selected, 1);
+        state.selected = -1;
+        updateInspector();
+        markChanged();
+      }
+      function setZoom(next, anchor) {
+        const before = anchor ? screenToWorld(anchor.x, anchor.y) : null;
+        state.zoom = Math.min(2.5, Math.max(.08, next));
+        if (before && anchor) {
+          const after = screenToWorld(anchor.x, anchor.y);
+          state.cameraX += before.x - after.x;
+          state.cameraY += before.y - after.y;
+        }
+        draw();
+      }
+      function fitMap() {
+        const objects = activeObjects();
+        if (!objects.length) { state.cameraX = 1024; state.cameraY = 768; state.zoom = .5; draw(); return; }
+        const xs = objects.map(item => item.xpos), ys = objects.map(item => item.ypos);
+        const { width, height } = viewSize();
+        state.cameraX = (Math.min(...xs) + Math.max(...xs)) / 2;
+        state.cameraY = (Math.min(...ys) + Math.max(...ys)) / 2;
+        const spanX = Math.max(600, Math.max(...xs) - Math.min(...xs) + 500);
+        const spanY = Math.max(450, Math.max(...ys) - Math.min(...ys) + 400);
+        state.zoom = Math.min(1.4, Math.max(.08, Math.min(width / spanX, height / spanY)));
+        draw();
+      }
+      function parseMap(buffer) {
+        if (buffer.byteLength !== FILE_BYTES) throw new Error(`Tamanho inválido: esperado ${FILE_BYTES.toLocaleString('pt-BR')} bytes, recebido ${buffer.byteLength.toLocaleString('pt-BR')}.`);
+        const view = new DataView(buffer);
+        const parsed = Array.from({ length: MAP_COUNT }, () => []);
+        for (let scene = 0; scene < MAP_COUNT; scene++) {
+          for (let item = 0; item < RECORD_COUNT; item++) {
+            const offset = (scene * RECORD_COUNT + item) * RECORD_BYTES;
+            const record = newRecord();
+            FIELDS.forEach(([key, , type], fieldIndex) => {
+              record[key] = type === 'float' ? view.getFloat32(offset + fieldIndex * 4, true) : view.getInt32(offset + fieldIndex * 4, true);
+            });
+            if (record.brush !== 0) parsed[scene].push(record);
+          }
+        }
+        return parsed;
+      }
+      function serializeMap() {
+        const buffer = new ArrayBuffer(FILE_BYTES);
+        const view = new DataView(buffer);
+        for (let scene = 0; scene < MAP_COUNT; scene++) {
+          const objects = maps[scene];
+          if (objects.length > RECORD_COUNT) throw new Error(`A cena ${scene + 1} excede o limite de ${RECORD_COUNT} objetos.`);
+          objects.forEach((record, item) => {
+            const offset = (scene * RECORD_COUNT + item) * RECORD_BYTES;
+            FIELDS.forEach(([key, , type], fieldIndex) => {
+              const value = Number.isFinite(record[key]) ? record[key] : 0;
+              if (type === 'float') view.setFloat32(offset + fieldIndex * 4, value, true);
+              else view.setInt32(offset + fieldIndex * 4, Math.trunc(value), true);
+            });
+          });
+        }
+        return buffer;
+      }
+      function exportMap() {
+        try {
+          const blob = new Blob([serializeMap()], { type: 'application/octet-stream' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = state.fileName || 'mapdata.monkmap';
+          link.click();
+          URL.revokeObjectURL(url);
+          setDirty(false);
+        } catch (error) { window.alert(error.message); }
+      }
+
+      document.getElementById('openButton').addEventListener('click', () => document.getElementById('fileInput').click());
+      document.getElementById('fileInput').addEventListener('change', async event => {
+        const file = event.target.files[0];
+        if (!file) return;
+        try {
+          const parsed = parseMap(await file.arrayBuffer());
+          maps.splice(0, MAP_COUNT, ...parsed);
+          state.fileName = file.name.toLowerCase().endsWith('.monkmap') ? file.name : 'mapdata.monkmap';
+          state.scene = 0; state.selected = -1;
+          setDirty(false); buildScenes(); updateInspector(); updateCount(); fitMap();
+        } catch (error) { window.alert(`Não foi possível abrir o mapa.\n${error.message}`); }
+        event.target.value = '';
+      });
+      document.getElementById('exportButton').addEventListener('click', exportMap);
+      document.getElementById('brushId').addEventListener('input', event => {
+        state.brushId = Math.min(255, Math.max(3, Number.parseInt(event.target.value, 10) || 3));
+        event.target.value = state.brushId;
+        if (state.mode === 'brush') setMode('brush');
+      });
+      [['brushXSize', 'brushXSize'], ['brushYSize', 'brushYSize'], ['brushZ', 'brushZ'], ['brushAngle', 'brushAngle']].forEach(([id, key]) => {
+        document.getElementById(id).addEventListener('input', event => {
+          state[key] = Number.parseFloat(event.target.value) || 0;
+          draw();
+        });
+      });
+      document.getElementById('snapToggle').addEventListener('change', event => { state.snap = event.target.checked; });
+      document.getElementById('flipToggle').addEventListener('change', event => { state.flip = event.target.checked; draw(); });
+      document.querySelectorAll('.tool-button').forEach(button => button.addEventListener('click', () => setMode(button.dataset.mode)));
+      document.getElementById('clearScene').addEventListener('click', () => {
+        if (!activeObjects().length || window.confirm(`Limpar todos os objetos de ${SCENES[state.scene]}?`)) {
+          maps[state.scene] = []; state.selected = -1; updateInspector(); markChanged();
+        }
+      });
+      document.getElementById('copyScene').addEventListener('click', () => {
+        state.clipboard = activeObjects().map(object => ({ ...object }));
+        document.getElementById('pasteScene').disabled = false;
+      });
+      document.getElementById('pasteScene').addEventListener('click', () => {
+        if (!state.clipboard) return;
+        maps[state.scene] = state.clipboard.map(object => ({ ...object }));
+        state.selected = -1; updateInspector(); markChanged();
+      });
+      document.getElementById('fitView').addEventListener('click', fitMap);
+      document.getElementById('centerView').addEventListener('click', () => { state.cameraX = 1024; state.cameraY = 768; draw(); });
+      document.getElementById('zoomIn').addEventListener('click', () => setZoom(state.zoom * 1.2));
+      document.getElementById('zoomOut').addEventListener('click', () => setZoom(state.zoom / 1.2));
+      document.getElementById('deleteThing').addEventListener('click', deleteSelected);
+      document.getElementById('duplicateThing').addEventListener('click', () => {
+        const object = activeObjects()[state.selected];
+        if (!object) return;
+        const copy = { ...object, xpos: object.xpos + 32, ypos: object.ypos + 32 };
+        activeObjects().push(copy); state.selected = activeObjects().length - 1;
+        updateInspector(); markChanged();
+      });
+
+      function canvasPoint(event) {
+        const rect = canvas.getBoundingClientRect();
+        return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      }
+      canvas.addEventListener('pointerdown', event => {
+        const point = canvasPoint(event);
+        const world = screenToWorld(point.x, point.y);
+        if (event.button === 1 || event.button === 2) {
+          state.drag = { kind: 'pan', clientX: event.clientX, clientY: event.clientY, cameraX: state.cameraX, cameraY: state.cameraY };
+          canvas.setPointerCapture(event.pointerId); event.preventDefault(); return;
+        }
+        if (state.mode === 'select') {
+          state.selected = hitTest(world);
+          updateInspector(); draw();
+          if (state.selected >= 0) {
+            state.drag = { kind: 'move', index: state.selected, startX: world.x, startY: world.y, objectX: activeObjects()[state.selected].xpos, objectY: activeObjects()[state.selected].ypos };
+            canvas.setPointerCapture(event.pointerId);
+          }
+        } else addObject(world);
+        canvas.focus();
+      });
+      canvas.addEventListener('pointermove', event => {
+        const point = canvasPoint(event);
+        const world = screenToWorld(point.x, point.y);
+        document.getElementById('cursorPosition').textContent = `X ${Math.round(world.x)} · Y ${Math.round(world.y)}`;
+        state.preview = { x: snapValue(world.x), y: snapValue(world.y) };
+        if (state.drag?.kind === 'pan') {
+          state.cameraX = state.drag.cameraX - (event.clientX - state.drag.clientX) / state.zoom;
+          state.cameraY = state.drag.cameraY - (event.clientY - state.drag.clientY) / state.zoom;
+        } else if (state.drag?.kind === 'move') {
+          const object = activeObjects()[state.drag.index];
+          if (object) {
+            object.xpos = snapValue(state.drag.objectX + world.x - state.drag.startX);
+            object.ypos = snapValue(state.drag.objectY + world.y - state.drag.startY);
+            propertyGrid.querySelectorAll('input').forEach(input => { if (input.dataset.field === 'xpos' || input.dataset.field === 'ypos') input.value = object[input.dataset.field]; });
+            setDirty(true);
+          }
+        }
+        draw();
+      });
+      canvas.addEventListener('pointerup', () => {
+        if (state.drag?.kind === 'move') { updateInspector(); markChanged(); }
+        state.drag = null;
+      });
+      canvas.addEventListener('pointercancel', () => { state.drag = null; });
+      canvas.addEventListener('contextmenu', event => event.preventDefault());
+      canvas.addEventListener('wheel', event => {
+        event.preventDefault();
+        const point = canvasPoint(event);
+        setZoom(state.zoom * (event.deltaY < 0 ? 1.1 : 1 / 1.1), point);
+      }, { passive: false });
+      canvas.addEventListener('pointerleave', () => { if (state.mode !== 'select') { state.preview = null; draw(); } });
+      document.addEventListener('keydown', event => {
+        if (event.target.matches('input, select, textarea')) return;
+        if (event.key === 'F1') { event.preventDefault(); setMode('brush'); }
+        else if (event.key === 'F2') { event.preventDefault(); setMode('platform'); }
+        else if (event.key === 'Escape') setMode('select');
+        else if (event.key === 'Delete' || event.key === 'Backspace') deleteSelected();
+        else if (event.key.toLowerCase() === 'a') document.getElementById('brushId').value = state.brushId = Math.max(3, state.brushId - 1);
+        else if (event.key.toLowerCase() === 's') document.getElementById('brushId').value = state.brushId = Math.min(255, state.brushId + 1);
+        else if (event.key.toLowerCase() === 'o') { state.flip = false; document.getElementById('flipToggle').checked = false; draw(); }
+        else if (event.key.toLowerCase() === 'p') { state.flip = true; document.getElementById('flipToggle').checked = true; draw(); }
+        else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+          event.preventDefault();
+          state.brushXSize += event.key === 'ArrowRight' ? 8 : -8;
+          document.getElementById('brushXSize').value = state.brushXSize; draw();
+        }
+        else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+          event.preventDefault();
+          state.brushYSize += event.key === 'ArrowUp' ? 8 : -8;
+          document.getElementById('brushYSize').value = state.brushYSize; draw();
+        }
+        else if (event.key.toLowerCase() === 'c' || event.key.toLowerCase() === 'd') {
+          state.brushZ += event.key.toLowerCase() === 'd' ? 0.05 : -0.05;
+          document.getElementById('brushZ').value = state.brushZ;
+          draw();
+        }
+        else if (event.key.toLowerCase() === 'z' || event.key.toLowerCase() === 'x') {
+          state.brushAngle += event.key.toLowerCase() === 'x' ? 0.02 : -0.02;
+          document.getElementById('brushAngle').value = state.brushAngle;
+          draw();
+        }
+      });
+      window.addEventListener('resize', resizeCanvas);
+      makePropertyInputs(); buildScenes(); updateInspector(); updateCount();
+      new ResizeObserver(resizeCanvas).observe(document.getElementById('canvasWrap'));
+    })();
+  </script>
+</body>
+</html>
